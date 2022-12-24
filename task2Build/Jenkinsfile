@@ -1,0 +1,57 @@
+pipeline {
+
+    agent {
+        label 'build2'
+    }
+    stages {
+	       
+        stage('Gitlab credentials') {
+            steps {
+                echo 'accessing master branch'
+                    git branch: 'master', credentialsId: 'GitLab credentials', url: 'http://52.20.154.51/gitlab-instance-e8513808/leumi2'            
+	    }
+        }
+
+	stage('Zip files for application') {
+            steps {
+                echo 'checking if app exists, if not creating it'
+	        sh 'zip function.zip lambda_function.py license.txt readme template.yaml' 
+                sh 'scp function.zip main.tf ubuntu@3.83.121.222:/home/ubuntu/' 
+	    }
+        }
+        
+        stage('create infrastructue and deploy via second server') {
+            steps {
+                echo 'creating lambda and s3 infrastructure, and then deploying via terraform'
+		script {
+		    sshagent(['DEPLOY_KEY']) {
+                        sh '''
+		        ssh -o StrictHostKeyChecking=no -l ubuntu 3.83.121.222 << EOF         
+                        terraform init
+                        terraform apply -auto-approve
+			'''
+		    }
+		}
+            }
+        }
+       
+        stage('create API gateway and connect to Lambda') {
+            steps {
+                echo 'creating gateway via build server and TF'
+                sh '''
+                cd /home/ubuntu/gitlab/api_gateway/
+                terraform init
+                terraform apply -auto-approve
+                '''
+            }
+        }
+    }
+    post {
+        failure {
+	    slackSend channel: "devops-alerts", message: "Build Failed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+        }
+	success {
+            slackSend channel: "succeeded-build", message: "Build Successful: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+	}
+    }
+}
