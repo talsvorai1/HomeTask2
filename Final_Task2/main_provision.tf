@@ -7,36 +7,31 @@ provider "aws" {
 resource "aws_lambda_function" "function" {
   filename         = "function.zip"
   function_name    = "my-function"
-  role             = "${aws_iam_role.hello_lambda_exec.arn}"
+  role             = "${aws_iam_role.lambda_role.arn}"
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.8"
   source_code_hash = "${filebase64sha256("function.zip")}"
 }
 
 # IAM role for the Lambda function
-resource "aws_iam_role" "hello_lambda_exec" {
-  name = "hello-lambda"
+resource "aws_iam_role" "lambda_role" {
+  name = "lambda_role"
 
-  assume_role_policy = <<POLICY
+  assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
       "Principal": {
         "Service": "lambda.amazonaws.com"
       },
-      "Action": "sts:AssumeRole"
+      "Effect": "Allow",
+      "Sid": ""
     }
   ]
 }
-POLICY
-}
-
-#IAM policy for role
-resource "aws_iam_role_policy_attachment" "hello_lambda_policy" {
-  role       = aws_iam_role.hello_lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+EOF
 }
 
 
@@ -51,3 +46,4 @@ resource "aws_s3_bucket_object" "function_code" {
   key = "function.zip"
   source = "function.zip"
 }
+
