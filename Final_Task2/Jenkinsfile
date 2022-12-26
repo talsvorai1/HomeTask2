@@ -24,6 +24,7 @@ pipeline {
         stage('Create infrastructue and deploy via second server') {
             steps {
                 echo 'Creating lambda and s3 infrastructure, deploying and saving in bucket via terraform'
+		echo 'Entering deployment server via ssh'    
 		script {
 		    sshagent(['DEPLOY_KEY']) {
                         sh '''
